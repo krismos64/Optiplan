@@ -1,18 +1,11 @@
 import { parseISO, format, eachDayOfInterval } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { settingsService } from './settingsService';
 
 interface TeamMember {
   id: string;
   nom: string;
-  role: string;
   heuresHebdo: number;
-  preferences?: {
-    horaires?: {
-      debut: string;
-      fin: string;
-    };
-    joursRepos?: string[];
-  };
 }
 
 interface PlanningDay {
@@ -23,11 +16,24 @@ interface PlanningDay {
     fin: string;
     ferme: boolean;
   };
-  equipe: string[];
+  equipe: {
+    membreId: string;
+    creneaux: { debut: string; fin: string; }[];
+  }[];
   tauxPresence: number;
 }
 
-const validateInputs = (debut: string, fin: string, membres: TeamMember[], horaires: any) => {
+const defaultHoraires = {
+  lundi: { debut: '08:30', fin: '20:00', ferme: false },
+  mardi: { debut: '08:30', fin: '20:00', ferme: false },
+  mercredi: { debut: '08:30', fin: '20:00', ferme: false },
+  jeudi: { debut: '08:30', fin: '20:00', ferme: false },
+  vendredi: { debut: '08:30', fin: '20:00', ferme: false },
+  samedi: { debut: '08:30', fin: '20:00', ferme: false },
+  dimanche: { debut: '08:45', fin: '12:30', ferme: false }
+};
+
+const validateInputs = (debut: string, fin: string, membres: TeamMember[]) => {
   if (!debut || !fin) {
     throw new Error('Les dates de début et de fin sont requises');
   }
@@ -46,142 +52,55 @@ const validateInputs = (debut: string, fin: string, membres: TeamMember[], horai
   if (dateFin < dateDebut) {
     throw new Error('La date de fin doit être postérieure à la date de début');
   }
-
-  if (!horaires || Object.keys(horaires).length === 0) {
-    throw new Error('Les horaires sont requis');
-  }
 };
 
-const calculerTauxPresenceRequis = (jourSemaine: string): number => {
-  switch (jourSemaine.toLowerCase()) {
-    case 'vendredi':
-    case 'samedi':
-      return 0.9; // 90% de l'équipe
-    case 'dimanche':
-      return 0.5; // 50% de l'équipe
-    default:
-      return 0.7; // 70% de l'équipe pour les autres jours
-  }
-};
-
-const calculerHeuresTravail = (horaires: { debut: string; fin: string }): number => {
-  const [debutHeure, debutMinute] = horaires.debut.split(':').map(Number);
-  const [finHeure, finMinute] = horaires.fin.split(':').map(Number);
-  return (finHeure + finMinute/60) - (debutHeure + debutMinute/60);
-};
-
-const estJourRepos = (membre: TeamMember, jourSemaine: string): boolean => {
-  return membre.preferences?.joursRepos?.includes(jourSemaine.toLowerCase()) || false;
-};
-
-export const generatePlanning = (
+export const generatePlanning = async (
   debut: string,
   fin: string,
-  membres: TeamMember[],
-  horaires: {
-    [jour: string]: {
-      debut: string;
-      fin: string;
-      ferme: boolean;
-    };
-  }
-): PlanningDay[] => {
+  membres: TeamMember[]
+): Promise<PlanningDay[]> => {
   try {
-    validateInputs(debut, fin, membres, horaires);
+    validateInputs(debut, fin, membres);
+
+    // Récupérer les horaires depuis les paramètres ou utiliser les horaires par défaut
+    const settings = await settingsService.getSettings('horaires');
+    const horaires = settings || defaultHoraires;
 
     const dateRange = eachDayOfInterval({
       start: parseISO(debut),
       end: parseISO(fin)
     });
 
-    // Initialiser les compteurs d'heures hebdomadaires
-    const heuresParMembre = new Map<string, {
-      heuresRestantes: number;
-      joursConsecutifs: number;
-    }>();
-
-    membres.forEach(membre => {
-      heuresParMembre.set(membre.id, {
-        heuresRestantes: membre.heuresHebdo,
-        joursConsecutifs: 0
-      });
-    });
-
+    // Distribution simple et équitable des membres
     const planningDays: PlanningDay[] = [];
-    let semaineEnCours = 0;
+    let currentMemberIndex = 0;
 
-    dateRange.forEach((date, index) => {
+    dateRange.forEach(date => {
       const jourSemaine = format(date, 'EEEE', { locale: fr }).toLowerCase();
       const horaireJour = horaires[jourSemaine];
 
-      // Nouvelle semaine
-      if (index % 7 === 0) {
-        semaineEnCours++;
-        membres.forEach(membre => {
-          heuresParMembre.set(membre.id, {
-            heuresRestantes: membre.heuresHebdo,
-            joursConsecutifs: heuresParMembre.get(membre.id)?.joursConsecutifs || 0
-          });
-        });
-      }
-
       if (!horaireJour.ferme) {
-        const heuresTravail = calculerHeuresTravail(horaireJour);
-        const tauxPresenceRequis = calculerTauxPresenceRequis(jourSemaine);
-        const nombreMembresRequis = Math.ceil(membres.length * tauxPresenceRequis);
+        // Sélectionner environ 70% des membres pour chaque jour
+        const nombreMembresNecessaires = Math.ceil(membres.length * 0.7);
+        const equipeDuJour = [];
 
-        // Sélectionner les membres disponibles
-        const membresDisponibles = membres.filter(membre => {
-          const stats = heuresParMembre.get(membre.id);
-          if (!stats) return false;
-
-          const estEnRepos = estJourRepos(membre, jourSemaine);
-          const aAssezHeures = stats.heuresRestantes >= heuresTravail;
-          const pasDepassementJoursConsecutifs = stats.joursConsecutifs < 5;
-
-          return !estEnRepos && aAssezHeures && pasDepassementJoursConsecutifs;
-        });
-
-        // Trier par priorité
-        const membresDuJour = membresDisponibles
-          .sort((a, b) => {
-            const statsA = heuresParMembre.get(a.id);
-            const statsB = heuresParMembre.get(b.id);
-            if (!statsA || !statsB) return 0;
-            return statsB.heuresRestantes - statsA.heuresRestantes;
-          })
-          .slice(0, nombreMembresRequis);
-
-        // Mettre à jour les compteurs
-        membresDuJour.forEach(membre => {
-          const stats = heuresParMembre.get(membre.id);
-          if (stats) {
-            heuresParMembre.set(membre.id, {
-              heuresRestantes: stats.heuresRestantes - heuresTravail,
-              joursConsecutifs: stats.joursConsecutifs + 1
-            });
-          }
-        });
-
-        // Réinitialiser les jours consécutifs pour les absents
-        membres.forEach(membre => {
-          if (!membresDuJour.includes(membre)) {
-            const stats = heuresParMembre.get(membre.id);
-            if (stats) {
-              heuresParMembre.set(membre.id, {
-                ...stats,
-                joursConsecutifs: 0
-              });
-            }
-          }
-        });
+        for (let i = 0; i < nombreMembresNecessaires; i++) {
+          equipeDuJour.push({
+            membreId: membres[currentMemberIndex].id,
+            creneaux: [{
+              debut: horaireJour.debut,
+              fin: horaireJour.fin
+            }]
+          });
+          currentMemberIndex = (currentMemberIndex + 1) % membres.length;
+        }
 
         planningDays.push({
           date: format(date, 'yyyy-MM-dd'),
           jourSemaine,
           horaires: horaireJour,
-          equipe: membresDuJour.map(m => m.id),
-          tauxPresence: membresDuJour.length / membres.length
+          equipe: equipeDuJour,
+          tauxPresence: equipeDuJour.length / membres.length
         });
       } else {
         planningDays.push({

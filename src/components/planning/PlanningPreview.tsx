@@ -1,62 +1,45 @@
 import React from 'react';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Clock, Users } from 'lucide-react';
-import { Planning, TeamMember, HoraireCreneau } from '../../types/planning';
+
+interface TeamMember {
+  id: string;
+  nom: string;
+  role: string;
+}
 
 interface PlanningPreviewProps {
-  planning: Planning;
+  jours: {
+    date: string;
+    jourSemaine: string;
+    horaires: {
+      debut: string;
+      fin: string;
+      ferme: boolean;
+    };
+    equipe: {
+      membreId: string;
+      creneaux: { debut: string; fin: string; }[];
+    }[];
+    tauxPresence: number;
+  }[];
   membres: TeamMember[];
   membreId?: string;
 }
 
-const PlanningPreview: React.FC<PlanningPreviewProps> = ({ planning, membres, membreId }) => {
-  const formatCreneaux = (creneaux: HoraireCreneau[] = []): string => {
-    if (!creneaux || creneaux.length === 0) return '-';
+const PlanningPreview: React.FC<PlanningPreviewProps> = ({ jours, membres, membreId }) => {
+  const membre = membreId ? membres.find(m => m.id === membreId) : null;
+
+  const formatCreneaux = (creneaux: { debut: string; fin: string; }[]) => {
     return creneaux.map(c => `${c.debut} - ${c.fin}`).join(', ');
   };
-
-  const calculerHeuresCreneau = (creneau: HoraireCreneau): number => {
-    if (!creneau) return 0;
-    const [debutH, debutM] = creneau.debut.split(':').map(Number);
-    const [finH, finM] = creneau.fin.split(':').map(Number);
-    return (finH + finM/60) - (debutH + debutM/60);
-  };
-
-  const calculerHeuresJour = (creneaux: HoraireCreneau[] = []): number => {
-    if (!creneaux || creneaux.length === 0) return 0;
-    return creneaux.reduce((acc, creneau) => acc + calculerHeuresCreneau(creneau), 0);
-  };
-
-  const calculerHeuresSemaine = (membreId: string): number => {
-    if (!planning.jours) return 0;
-    return planning.jours.reduce((acc, jour) => {
-      const membreJour = jour.equipe.find(e => e.membreId === membreId);
-      if (membreJour && membreJour.creneaux) {
-        return acc + calculerHeuresJour(membreJour.creneaux);
-      }
-      return acc;
-    }, 0);
-  };
-
-  const membre = membreId ? membres.find(m => m.id === membreId) : null;
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       {membre && (
         <div className="p-4 bg-indigo-50 border-b border-indigo-100">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-lg font-semibold text-indigo-900">{membre.nom}</h3>
-              <p className="text-sm text-indigo-600">{membre.role}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Heures hebdomadaires</p>
-              <p className="text-lg font-semibold text-indigo-600">
-                {calculerHeuresSemaine(membre.id).toFixed(1)}h
-              </p>
-            </div>
-          </div>
+          <h3 className="text-lg font-semibold text-indigo-900">{membre.nom}</h3>
+          <p className="text-sm text-indigo-600">{membre.role}</p>
         </div>
       )}
 
@@ -80,25 +63,18 @@ const PlanningPreview: React.FC<PlanningPreviewProps> = ({ planning, membres, me
                   </th>
                 </>
               )}
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Heures
-              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {planning.jours?.map((jour) => {
-              const membreJour = membreId ? jour.equipe.find(e => e.membreId === membreId) : null;
+            {jours.map((jour) => {
+              const membreJour = membreId ? 
+                jour.equipe.find(e => e.membreId === membreId) : null;
               const estPresent = membreId ? !!membreJour : true;
-              const heuresJour = membreJour 
-                ? calculerHeuresJour(membreJour.creneaux)
-                : 0;
 
               return (
                 <tr 
                   key={jour.date}
-                  className={`${
-                    !estPresent ? 'bg-gray-50 text-gray-400' : 'hover:bg-gray-50'
-                  }`}
+                  className={`${!estPresent ? 'bg-gray-50 text-gray-400' : 'hover:bg-gray-50'}`}
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm">
@@ -125,7 +101,7 @@ const PlanningPreview: React.FC<PlanningPreviewProps> = ({ planning, membres, me
                       )
                     ) : (
                       <div className="text-sm text-gray-900">
-                        {formatCreneaux(jour.horaires.creneaux)}
+                        {jour.horaires.debut} - {jour.horaires.fin}
                       </div>
                     )}
                   </td>
@@ -161,31 +137,10 @@ const PlanningPreview: React.FC<PlanningPreviewProps> = ({ planning, membres, me
                       </td>
                     </>
                   )}
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {estPresent && !jour.horaires.ferme ? (
-                      <span className="font-medium text-indigo-600">
-                        {heuresJour.toFixed(1)}h
-                      </span>
-                    ) : (
-                      '-'
-                    )}
-                  </td>
                 </tr>
               );
             })}
           </tbody>
-          {membreId && (
-            <tfoot className="bg-gray-50">
-              <tr>
-                <td colSpan={2} className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  Total des heures
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-indigo-600">
-                  {calculerHeuresSemaine(membreId).toFixed(1)}h
-                </td>
-              </tr>
-            </tfoot>
-          )}
         </table>
       </div>
     </div>

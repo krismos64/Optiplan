@@ -1,65 +1,81 @@
-import React, { useState } from 'react';
-import { Plus, Search, Calendar, Download, Trash2, Edit2, X, AlertCircle } from 'lucide-react';
-import { useFirebaseCollection } from '../../hooks/useFirebase';
+import React, { useState, useEffect } from 'react';
+import { Plus, Search, Calendar, Download, Trash2, Edit2, X, AlertCircle, Eye } from 'lucide-react';
 import { useFirebaseError } from '../../hooks/useFirebaseError';
 import PlanningForm from './PlanningForm';
 import DeleteConfirmationModal from '../../components/modals/DeleteConfirmationModal';
 import { exportToPDF } from '../../utils/exportUtils';
-import ExportMenu from '../../components/planning/ExportMenu';
 import PlanningPreview from '../../components/planning/PlanningPreview';
-import { Planning, TeamMember } from '../../types/planning';
 import { firebaseService } from '../../services/firebaseService';
 
 const PlanningList = () => {
-  const [showForm, setShowForm] = useState(false);
+  const [plannings, setPlannings] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPlanning, setSelectedPlanning] = useState<Planning | null>(null);
+  const [selectedPlanning, setSelectedPlanning] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [editingPlanning, setEditingPlanning] = useState<Planning | null>(null);
-  
-  const { error, loading, handleFirebaseOperation } = useFirebaseError();
-  const { data: plannings = [] } = useFirebaseCollection<Planning>('plannings');
-  const { data: members = [] } = useFirebaseCollection<TeamMember>('team');
+  const [editingPlanning, setEditingPlanning] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
 
-  const handleDelete = async (planningId: string) => {
-    await handleFirebaseOperation(
-      async () => {
-        await firebaseService.deletePlanning(planningId);
-        setShowDeleteModal(false);
-        setSelectedPlanning(null);
-      },
-      'Erreur lors de la suppression du planning'
-    );
+  const { error, handleFirebaseOperation } = useFirebaseError();
+
+  useEffect(() => {
+    const loadPlannings = async () => {
+      try {
+        setLoading(true);
+        const result = await firebaseService.getPlannings();
+        if (result) {
+          setPlannings(result);
+        }
+      } catch (err) {
+        console.error('Erreur lors du chargement des plannings:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPlannings();
+  }, []);
+
+  const handleDelete = async (planningId) => {
+    try {
+      await handleFirebaseOperation(
+        async () => {
+          await firebaseService.deletePlanning(planningId);
+          setPlannings(prev => prev.filter(p => p.id !== planningId));
+          setShowDeleteModal(false);
+          setSelectedPlanning(null);
+        },
+        'Erreur lors de la suppression du planning'
+      );
+    } catch (err) {
+      console.error('Erreur lors de la suppression:', err);
+    }
   };
 
-  const handleExport = async (planning: Planning, memberId?: string) => {
-    await handleFirebaseOperation(
-      async () => {
-        await exportToPDF(planning, members, memberId);
-      },
-      'Erreur lors de l\'export du planning'
-    );
+  const handleExport = async (planning) => {
+    try {
+      await handleFirebaseOperation(
+        async () => {
+          await exportToPDF(planning);
+        },
+        'Erreur lors de l\'export du planning'
+      );
+    } catch (err) {
+      console.error('Erreur lors de l\'export:', err);
+    }
   };
 
-  const handlePreview = (planning: Planning, memberId?: string) => {
-    setSelectedPlanning({
-      ...planning,
-      previewMemberId: memberId
-    } as Planning);
+  const handlePreview = (planning) => {
+    setSelectedPlanning(planning);
     setShowPreview(true);
-  };
-
-  const handleEdit = (planning: Planning) => {
-    setEditingPlanning(planning);
-    setShowForm(true);
   };
 
   const filteredPlannings = plannings.filter(planning =>
     planning.nom.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) {
+  if (loading && plannings.length === 0) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -114,7 +130,6 @@ const PlanningList = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nom</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Période</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Membres</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -133,49 +148,29 @@ const PlanningList = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex -space-x-2">
-                      {planning.membres.slice(0, 3).map((membreId) => {
-                        const membre = members.find(m => m.id === membreId);
-                        return membre ? (
-                          <div
-                            key={membre.id}
-                            className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center border-2 border-white"
-                            title={membre.nom}
-                          >
-                            <span className="text-xs font-medium text-indigo-600">
-                              {membre.nom.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                        ) : null;
-                      })}
-                      {planning.membres.length > 3 && (
-                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center border-2 border-white">
-                          <span className="text-xs font-medium text-gray-600">
-                            +{planning.membres.length - 3}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      planning.statut === 'actif' 
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {planning.statut}
+                    <span className="text-sm text-gray-500">
+                      {planning.membres?.length || 0} membre(s)
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="flex items-center space-x-4">
-                      <ExportMenu
-                        planning={planning}
-                        members={members}
-                        onExport={(memberId) => handleExport(planning, memberId)}
-                        onPreview={(memberId) => handlePreview(planning, memberId)}
-                      />
                       <button
-                        onClick={() => handleEdit(planning)}
+                        onClick={() => handlePreview(planning)}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        <Eye className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleExport(planning)}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        <Download className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingPlanning(planning);
+                          setShowForm(true);
+                        }}
                         className="text-indigo-600 hover:text-indigo-900"
                       >
                         <Edit2 className="w-5 h-5" />
@@ -200,7 +195,6 @@ const PlanningList = () => {
 
       {showForm && (
         <PlanningForm
-          members={members}
           onClose={() => {
             setShowForm(false);
             setEditingPlanning(null);
@@ -242,9 +236,8 @@ const PlanningList = () => {
             </div>
             <div className="p-6">
               <PlanningPreview
-                jours={selectedPlanning.jours}
-                membres={members}
-                membreId={selectedPlanning.previewMemberId}
+                jours={selectedPlanning.jours || []}
+                membres={selectedPlanning.membres || []}
               />
             </div>
           </div>

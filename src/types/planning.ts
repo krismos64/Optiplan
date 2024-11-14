@@ -35,12 +35,6 @@ export interface PlanningJour {
 export interface TeamMember {
   id: string;
   nom: string;
-  role: string;
   heuresHebdo: number;
-  preferences?: {
-    creneaux?: {
-      [jour: string]: HoraireCreneau[];
-    };
-    joursRepos?: string[];
-  };
+  compteurHeures: number;
 }

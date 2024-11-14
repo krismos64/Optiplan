@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Save, Building } from 'lucide-react';
 import { useFirebaseError } from '../../../hooks/useFirebaseError';
-import { firebaseService } from '../../../services/firebaseService';
+import { settingsService } from '../../../services/settingsService';
 
 const GeneralSettings = () => {
   const [formData, setFormData] = useState({
@@ -10,16 +10,35 @@ const GeneralSettings = () => {
     telephone: '',
     email: '',
     logo: '',
-    theme: 'light'
+    theme: 'light',
+    dateCreation: new Date().toISOString()
   });
 
   const { error, loading, handleFirebaseOperation } = useFirebaseError();
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await settingsService.getSettings('general');
+        if (settings) {
+          setFormData(settings);
+        }
+      } catch (err) {
+        console.error('Erreur lors du chargement des paramètres:', err);
+      }
+    };
+
+    loadSettings();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await handleFirebaseOperation(
       async () => {
-        await firebaseService.updateSettings('general', formData);
+        await settingsService.updateSettings('general', {
+          ...formData,
+          derniereMiseAJour: new Date().toISOString()
+        });
       },
       'Erreur lors de la sauvegarde des paramètres généraux'
     );
@@ -39,6 +58,7 @@ const GeneralSettings = () => {
             value={formData.nomEntreprise}
             onChange={(e) => setFormData(prev => ({ ...prev, nomEntreprise: e.target.value }))}
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            required
           />
         </div>
 
@@ -51,6 +71,7 @@ const GeneralSettings = () => {
             onChange={(e) => setFormData(prev => ({ ...prev, adresse: e.target.value }))}
             rows={3}
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            required
           />
         </div>
 
@@ -64,6 +85,7 @@ const GeneralSettings = () => {
               value={formData.telephone}
               onChange={(e) => setFormData(prev => ({ ...prev, telephone: e.target.value }))}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              required
             />
           </div>
           <div>
@@ -75,8 +97,22 @@ const GeneralSettings = () => {
               value={formData.email}
               onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              required
             />
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            URL du logo
+          </label>
+          <input
+            type="url"
+            value={formData.logo}
+            onChange={(e) => setFormData(prev => ({ ...prev, logo: e.target.value }))}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="https://exemple.com/logo.png"
+          />
         </div>
 
         <div>
@@ -93,6 +129,12 @@ const GeneralSettings = () => {
             <option value="system">Système</option>
           </select>
         </div>
+
+        {error && (
+          <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+            {error}
+          </div>
+        )}
 
         <div className="flex justify-end">
           <button

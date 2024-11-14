@@ -1,13 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Calendar, 
-  Users, 
-  FileSpreadsheet,
-  Settings, 
-  LogOut 
-} from 'lucide-react';
+import { Calendar, Users, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Sidebar = () => {
@@ -21,11 +14,8 @@ const Sidebar = () => {
   };
 
   const menuItems = [
-    { icon: LayoutDashboard, label: 'Tableau de bord', path: '/dashboard' },
     { icon: Calendar, label: 'Plannings', path: '/dashboard/plannings' },
-    { icon: Users, label: 'Équipe', path: '/dashboard/team' },
-    { icon: FileSpreadsheet, label: 'Rapports', path: '/dashboard/reports' },
-    { icon: Settings, label: 'Paramètres', path: '/dashboard/parametres' },
+    { icon: Users, label: 'Équipe', path: '/dashboard/team' }
   ];
 
   return (

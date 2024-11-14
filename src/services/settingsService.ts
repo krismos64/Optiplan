@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 export const settingsService = {
@@ -14,27 +14,20 @@ export const settingsService = {
       return null;
     } catch (error) {
       console.error(`Erreur lors de la récupération des paramètres ${section}:`, error);
-      throw error;
+      throw new Error('Impossible de récupérer les paramètres');
     }
   },
 
   async updateSettings(section: string, data: any) {
     try {
       const docRef = doc(db, 'settings', section);
-      const docSnap = await getDoc(docRef);
-      
-      if (docSnap.exists()) {
-        await updateDoc(docRef, data);
-      } else {
-        await setDoc(docRef, {
-          ...data,
-          dateCreation: new Date(),
-          derniereMiseAJour: new Date()
-        });
-      }
+      await setDoc(docRef, {
+        ...data,
+        derniereMiseAJour: new Date().toISOString()
+      });
     } catch (error) {
       console.error(`Erreur lors de la mise à jour des paramètres ${section}:`, error);
-      throw error;
+      throw new Error('Impossible de sauvegarder les paramètres');
     }
   }
 };

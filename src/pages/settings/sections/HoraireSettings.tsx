@@ -1,32 +1,60 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Save } from 'lucide-react';
 import { useFirebaseError } from '../../../hooks/useFirebaseError';
-import { firebaseService } from '../../../services/firebaseService';
-import CreneauHoraire from '../../../components/planning/CreneauHoraire';
+import { settingsService } from '../../../services/settingsService';
 
 const JOURS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 
-const HoraireSettings = () => {
-  const [horaires, setHoraires] = useState({
-    lundi: { creneaux: [{ debut: '08:30', fin: '20:15' }], ferme: false },
-    mardi: { creneaux: [{ debut: '08:30', fin: '20:15' }], ferme: false },
-    mercredi: { creneaux: [{ debut: '08:30', fin: '20:15' }], ferme: false },
-    jeudi: { creneaux: [{ debut: '08:30', fin: '20:15' }], ferme: false },
-    vendredi: { creneaux: [{ debut: '08:30', fin: '20:15' }], ferme: false },
-    samedi: { creneaux: [{ debut: '08:30', fin: '20:15' }], ferme: false },
-    dimanche: { creneaux: [{ debut: '08:45', fin: '12:30' }], ferme: false }
-  });
+const defaultHoraires = {
+  lundi: { debut: '08:30', fin: '20:00', ferme: false },
+  mardi: { debut: '08:30', fin: '20:00', ferme: false },
+  mercredi: { debut: '08:30', fin: '20:00', ferme: false },
+  jeudi: { debut: '08:30', fin: '20:00', ferme: false },
+  vendredi: { debut: '08:30', fin: '20:00', ferme: false },
+  samedi: { debut: '08:30', fin: '20:00', ferme: false },
+  dimanche: { debut: '08:45', fin: '12:30', ferme: false }
+};
 
+const HoraireSettings = () => {
+  const [horaires, setHoraires] = useState(defaultHoraires);
   const { error, loading, handleFirebaseOperation } = useFirebaseError();
+
+  useEffect(() => {
+    const loadHoraires = async () => {
+      try {
+        const settings = await settingsService.getSettings('horaires');
+        if (settings) {
+          setHoraires(settings);
+        }
+      } catch (err) {
+        console.error('Erreur lors du chargement des horaires:', err);
+      }
+    };
+
+    loadHoraires();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await handleFirebaseOperation(
       async () => {
-        await firebaseService.updateSettings('horaires', horaires);
+        await settingsService.updateSettings('horaires', {
+          ...horaires,
+          derniereMiseAJour: new Date().toISOString()
+        });
       },
       'Erreur lors de la sauvegarde des horaires'
     );
+  };
+
+  const handleHoraireChange = (jour: string, type: 'debut' | 'fin', value: string) => {
+    setHoraires(prev => ({
+      ...prev,
+      [jour]: {
+        ...prev[jour],
+        [type]: value
+      }
+    }));
   };
 
   const handleFermetureToggle = (jour: string) => {
@@ -39,19 +67,9 @@ const HoraireSettings = () => {
     }));
   };
 
-  const handleCreneauxChange = (jour: string, creneaux: any[]) => {
-    setHoraires(prev => ({
-      ...prev,
-      [jour]: {
-        ...prev[jour],
-        creneaux
-      }
-    }));
-  };
-
   return (
     <div className="p-6">
-      <h2 className="text-xl font-semibold text-gray-900 mb-6">Horaires par défaut</h2>
+      <h2 className="text-xl font-semibold text-gray-900 mb-6">Horaires d'ouverture</h2>
       
       <form onSubmit={handleSubmit} className="space-y-6">
         {JOURS.map(jour => (
@@ -72,15 +90,41 @@ const HoraireSettings = () => {
             </div>
 
             {!horaires[jour].ferme && (
-              <CreneauHoraire
-                creneaux={horaires[jour].creneaux}
-                onChange={(creneaux) => handleCreneauxChange(jour, creneaux)}
-                minCreneaux={1}
-                maxCreneaux={3}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Heure d'ouverture
+                  </label>
+                  <input
+                    type="time"
+                    value={horaires[jour].debut}
+                    onChange={(e) => handleHoraireChange(jour, 'debut', e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Heure de fermeture
+                  </label>
+                  <input
+                    type="time"
+                    value={horaires[jour].fin}
+                    onChange={(e) => handleHoraireChange(jour, 'fin', e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    required
+                  />
+                </div>
+              </div>
             )}
           </div>
         ))}
+
+        {error && (
+          <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+            {error}
+          </div>
+        )}
 
         <div className="flex justify-end">
           <button

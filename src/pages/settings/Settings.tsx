@@ -1,20 +1,14 @@
 import React, { useState } from 'react';
-import { Settings as SettingsIcon, Building, Clock, Users, Bell, Shield } from 'lucide-react';
+import { Settings as SettingsIcon, Building, Clock } from 'lucide-react';
 import GeneralSettings from './sections/GeneralSettings';
 import HoraireSettings from './sections/HoraireSettings';
-import TeamSettings from './sections/TeamSettings';
-import NotificationSettings from './sections/NotificationSettings';
-import SecuritySettings from './sections/SecuritySettings';
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState('general');
 
   const tabs = [
     { id: 'general', label: 'Général', icon: Building },
-    { id: 'horaires', label: 'Horaires', icon: Clock },
-    { id: 'equipe', label: 'Équipe', icon: Users },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'securite', label: 'Sécurité', icon: Shield }
+    { id: 'horaires', label: 'Horaires', icon: Clock }
   ];
 
   const renderContent = () => {
@@ -23,12 +17,6 @@ const Settings = () => {
         return <GeneralSettings />;
       case 'horaires':
         return <HoraireSettings />;
-      case 'equipe':
-        return <TeamSettings />;
-      case 'notifications':
-        return <NotificationSettings />;
-      case 'securite':
-        return <SecuritySettings />;
       default:
         return null;
     }
@@ -45,7 +33,6 @@ const Settings = () => {
       </div>
 
       <div className="flex">
-        {/* Sidebar */}
         <div className="w-64 pr-8">
           <nav className="space-y-1">
             {tabs.map(tab => (
@@ -67,7 +54,6 @@ const Settings = () => {
           </nav>
         </div>
 
-        {/* Content */}
         <div className="flex-1 bg-white rounded-lg shadow-md">
           {renderContent()}
         </div>

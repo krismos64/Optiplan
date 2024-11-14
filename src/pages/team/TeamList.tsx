@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, UserPlus, Trash2, Edit2 } from 'lucide-react';
+import { Plus, Search, UserPlus, Trash2, Edit2 } from 'lucide-react';
 import { collection, query, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import TeamMemberForm from './TeamMemberForm';
@@ -8,9 +8,8 @@ import DeleteConfirmationModal from '../../components/modals/DeleteConfirmationM
 interface TeamMember {
   id: string;
   nom: string;
-  role: string;
   heuresHebdo: number;
-  statut: 'actif' | 'inactif';
+  compteurHeures: number;
 }
 
 const TeamList = () => {
@@ -19,8 +18,6 @@ const TeamList = () => {
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterRole, setFilterRole] = useState('');
-  const [availableRoles, setAvailableRoles] = useState<string[]>([]);
 
   useEffect(() => {
     const q = query(collection(db, 'team'));
@@ -30,10 +27,6 @@ const TeamList = () => {
         ...doc.data()
       })) as TeamMember[];
       setMembers(membersData);
-      
-      // Extraire les rôles uniques
-      const roles = [...new Set(membersData.map(member => member.role))];
-      setAvailableRoles(roles);
     });
 
     return () => unsubscribe();
@@ -51,8 +44,7 @@ const TeamList = () => {
 
   const filteredMembers = members.filter(member => {
     const matchesSearch = member.nom.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = filterRole ? member.role === filterRole : true;
-    return matchesSearch && matchesRole;
+    return matchesSearch;
   });
 
   return (
@@ -86,18 +78,6 @@ const TeamList = () => {
               className="pl-10 w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
-          <div className="flex items-center space-x-4">
-            <select
-              value={filterRole}
-              onChange={(e) => setFilterRole(e.target.value)}
-              className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option value="">Tous les rôles</option>
-              {availableRoles.map((role) => (
-                <option key={role} value={role}>{role}</option>
-              ))}
-            </select>
-          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -105,9 +85,8 @@ const TeamList = () => {
             <thead>
               <tr className="bg-gray-50">
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Membre</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rôle</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Heures/Semaine</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Compteur d'heures</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -129,18 +108,13 @@ const TeamList = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-900">{member.role}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm text-gray-900">{member.heuresHebdo}h</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      member.statut === 'actif' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
+                    <span className={`text-sm font-medium ${
+                      member.compteurHeures >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {member.statut}
+                      {member.compteurHeures}h
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -175,7 +149,6 @@ const TeamList = () => {
       {showForm && (
         <TeamMemberForm
           member={selectedMember}
-          availableRoles={availableRoles}
           onClose={() => {
             setShowForm(false);
             setSelectedMember(null);

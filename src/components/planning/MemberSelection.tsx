@@ -13,8 +13,8 @@ interface MemberSelectionProps {
 }
 
 const MemberSelection: React.FC<MemberSelectionProps> = ({
-  members,
-  selectedMembers,
+  members = [],
+  selectedMembers = [],
   onMemberToggle,
   onSelectAll
 }) => {
