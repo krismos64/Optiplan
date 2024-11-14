@@ -1,84 +1,89 @@
-import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
-import { collection, addDoc, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../config/firebase';
-import MemberSelection from '../../components/planning/MemberSelection';
-import ManualPlanningList from './ManualPlanningList';
+import { useState, useEffect } from "react";
+import { X } from "lucide-react";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
+import { db } from "../../config/firebase";
+import MemberSelection from "../../components/planning/MemberSelection";
+import ManualPlanningList from "./ManualPlanningList";
 
+// Typage des interfaces
 interface PlanningFormProps {
   onClose: () => void;
-  planning?: any;
+  planning?: Planning;
+}
+
+interface Planning {
+  id?: string;
+  nom: string;
+  debut: string;
+  fin: string;
+  membres: Membre[];
+  jours?: PlanningJour[];
+}
+
+interface Membre {
+  id: string;
+  nom: string;
+}
+
+interface PlanningJour {
+  date: string;
+  equipe: { membreId: string; creneaux: { debut: string; fin: string }[] }[];
 }
 
 const PlanningForm: React.FC<PlanningFormProps> = ({ onClose, planning }) => {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [members, setMembers] = useState([]);
+  const [members, setMembers] = useState<Membre[]>([]);
   const [formData, setFormData] = useState({
-    nom: planning?.nom || '',
-    debut: planning?.debut || '',
-    fin: planning?.fin || '',
-    membresSelectionnes: planning?.membres || []
+    nom: planning?.nom || "",
+    debut: planning?.debut || "",
+    fin: planning?.fin || "",
+    membresSelectionnes: planning?.membres.map((m) => m.id) || [],
   });
-  const [planningJours, setPlanningJours] = useState(planning?.jours || []);
+  const [planningJours, setPlanningJours] = useState<PlanningJour[]>(
+    planning?.jours || []
+  );
 
   useEffect(() => {
     const loadMembers = async () => {
       try {
-        const membersRef = collection(db, 'team');
+        const membersRef = collection(db, "team");
         const snapshot = await getDocs(membersRef);
-        const membersData = snapshot.docs.map(doc => ({
+        const membersData = snapshot.docs.map((doc) => ({
           id: doc.id,
-          ...doc.data()
-        }));
+          ...doc.data(),
+        })) as Membre[];
         setMembers(membersData);
       } catch (err) {
-        console.error('Erreur lors du chargement des membres:', err);
-        setError('Erreur lors du chargement des membres');
+        console.error("Erreur lors du chargement des membres:", err);
+        setError("Erreur lors du chargement des membres");
       }
     };
 
-    loadMembers();
-  }, []);
-
-  const validateStep = (step: number) => {
-    switch (step) {
-      case 1:
-        if (!formData.nom.trim()) {
-          throw new Error('Le nom du planning est requis');
-        }
-        if (!formData.debut || !formData.fin) {
-          throw new Error('Les dates de début et de fin sont requises');
-        }
-        const dateDebut = new Date(formData.debut);
-        const dateFin = new Date(formData.fin);
-        if (dateFin < dateDebut) {
-          throw new Error('La date de fin doit être postérieure à la date de début');
-        }
-        break;
-
-      case 2:
-        if (formData.membresSelectionnes.length === 0) {
-          throw new Error('Veuillez sélectionner au moins un membre');
-        }
-        break;
+    if (!planning) {
+      loadMembers();
+    } else {
+      setMembers(planning.membres || []);
     }
-  };
+  }, [planning]);
 
   const handleNext = () => {
-    try {
-      validateStep(currentStep);
-      setCurrentStep(prev => prev + 1);
-      setError(null);
-    } catch (err: any) {
-      setError(err.message);
-    }
+    setCurrentStep((prev) => prev + 1);
+    setError(null);
+    console.log("Étape actuelle après handleNext:", currentStep + 1);
   };
 
   const handleBack = () => {
-    setCurrentStep(prev => prev - 1);
+    setCurrentStep((prev) => prev - 1);
     setError(null);
+    console.log("Étape actuelle après handleBack:", currentStep - 1);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,46 +92,46 @@ const PlanningForm: React.FC<PlanningFormProps> = ({ onClose, planning }) => {
     setIsSubmitting(true);
 
     try {
-      const planningData = {
+      const planningData: Partial<Planning> = {
         nom: formData.nom,
         debut: formData.debut,
         fin: formData.fin,
-        membres: formData.membresSelectionnes,
+        membres: members.filter((m) =>
+          formData.membresSelectionnes.includes(m.id)
+        ),
         jours: planningJours,
-        dateCreation: new Date().toISOString(),
-        derniereMiseAJour: new Date().toISOString()
       };
 
       if (planning?.id) {
-        await updateDoc(doc(db, 'plannings', planning.id), planningData);
+        await updateDoc(doc(db, "plannings", planning.id), planningData);
       } else {
-        await addDoc(collection(db, 'plannings'), planningData);
+        await addDoc(collection(db, "plannings"), planningData);
       }
 
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Une erreur est survenue');
+      setError(err.message || "Une erreur est survenue");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleMemberToggle = (memberId: string, selected: boolean) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       membresSelectionnes: selected
         ? [...prev.membresSelectionnes, memberId]
-        : prev.membresSelectionnes.filter(id => id !== memberId)
+        : prev.membresSelectionnes.filter((id) => id !== memberId),
     }));
   };
 
   const handleSelectAllMembers = () => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      membresSelectionnes: 
-        prev.membresSelectionnes.length === members.length 
-          ? [] 
-          : members.map(m => m.id)
+      membresSelectionnes:
+        prev.membresSelectionnes.length === members.length
+          ? []
+          : members.map((m) => m.id),
     }));
   };
 
@@ -142,7 +147,9 @@ const PlanningForm: React.FC<PlanningFormProps> = ({ onClose, planning }) => {
               <input
                 type="text"
                 value={formData.nom}
-                onChange={(e) => setFormData(prev => ({ ...prev, nom: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, nom: e.target.value }))
+                }
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 required
               />
@@ -156,7 +163,9 @@ const PlanningForm: React.FC<PlanningFormProps> = ({ onClose, planning }) => {
                 <input
                   type="date"
                   value={formData.debut}
-                  onChange={(e) => setFormData(prev => ({ ...prev, debut: e.target.value }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, debut: e.target.value }))
+                  }
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   required
                 />
@@ -168,7 +177,9 @@ const PlanningForm: React.FC<PlanningFormProps> = ({ onClose, planning }) => {
                 <input
                   type="date"
                   value={formData.fin}
-                  onChange={(e) => setFormData(prev => ({ ...prev, fin: e.target.value }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, fin: e.target.value }))
+                  }
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   required
                 />
@@ -192,9 +203,11 @@ const PlanningForm: React.FC<PlanningFormProps> = ({ onClose, planning }) => {
           <ManualPlanningList
             debut={formData.debut}
             fin={formData.fin}
-            membres={members.filter(m => formData.membresSelectionnes.includes(m.id))}
+            membres={members.filter((m) =>
+              formData.membresSelectionnes.includes(m.id)
+            )}
             onSave={setPlanningJours}
-            initialJours={planningJours}
+            initialJours={[]} // Testez avec une liste vide
           />
         );
 
@@ -209,11 +222,14 @@ const PlanningForm: React.FC<PlanningFormProps> = ({ onClose, planning }) => {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h2 className="text-2xl font-bold text-indigo-900">
-              {planning ? 'Modifier le planning' : 'Nouveau Planning'}
+              {planning ? "Modifier le planning" : "Nouveau Planning"}
             </h2>
             <p className="text-sm text-gray-500">Étape {currentStep} sur 3</p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -251,7 +267,7 @@ const PlanningForm: React.FC<PlanningFormProps> = ({ onClose, planning }) => {
                 type="submit"
                 disabled={isSubmitting}
                 className={`ml-auto px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center ${
-                  isSubmitting ? 'opacity-75 cursor-not-allowed' : ''
+                  isSubmitting ? "opacity-75 cursor-not-allowed" : ""
                 }`}
               >
                 {isSubmitting ? (
@@ -260,7 +276,7 @@ const PlanningForm: React.FC<PlanningFormProps> = ({ onClose, planning }) => {
                     Enregistrement...
                   </>
                 ) : (
-                  'Enregistrer le planning'
+                  "Enregistrer le planning"
                 )}
               </button>
             )}

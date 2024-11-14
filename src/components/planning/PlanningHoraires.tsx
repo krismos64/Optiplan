@@ -1,15 +1,17 @@
-import React from 'react';
-import { Clock } from 'lucide-react';
+import React from "react";
+import { Clock } from "lucide-react";
+
+interface Horaire {
+  debut: string;
+  fin: string;
+  ferme: boolean;
+}
 
 interface PlanningHorairesProps {
   horaires: {
-    [jour: string]: {
-      debut: string;
-      fin: string;
-      ferme: boolean;
-    };
+    [jour: string]: Horaire;
   };
-  onHoraireChange: (jour: string, type: 'debut' | 'fin', value: string) => void;
+  onHoraireChange: (jour: string, type: "debut" | "fin", value: string) => void;
   onFermetureToggle: (jour: string) => void;
   onAppliquerPartout: (jour: string) => void;
 }
@@ -18,33 +20,47 @@ const PlanningHoraires: React.FC<PlanningHorairesProps> = ({
   horaires,
   onHoraireChange,
   onFermetureToggle,
-  onAppliquerPartout
+  onAppliquerPartout,
 }) => {
   return (
     <div>
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Horaires par défaut</h3>
+      <h3 className="text-lg font-medium text-gray-900 mb-4">
+        Horaires par défaut
+      </h3>
       <div className="space-y-4">
         {Object.entries(horaires).map(([jour, horaire]) => (
           <div key={jour} className="flex items-center space-x-4">
             <span className="w-24 text-sm font-medium text-gray-700">
               {jour.charAt(0).toUpperCase() + jour.slice(1)}
             </span>
-            
+
             {!horaire.ferme ? (
               <>
                 <div className="flex items-center space-x-2">
-                  <Clock className="w-5 h-5 text-gray-400" />
+                  <Clock className="w-5 h-5 text-gray-400" aria-hidden="true" />
+                  <label htmlFor={`${jour}-debut`} className="sr-only">
+                    Heure de début pour {jour}
+                  </label>
                   <input
+                    id={`${jour}-debut`}
                     type="time"
                     value={horaire.debut}
-                    onChange={(e) => onHoraireChange(jour, 'debut', e.target.value)}
+                    onChange={(e) =>
+                      onHoraireChange(jour, "debut", e.target.value)
+                    }
                     className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                   <span>-</span>
+                  <label htmlFor={`${jour}-fin`} className="sr-only">
+                    Heure de fin pour {jour}
+                  </label>
                   <input
+                    id={`${jour}-fin`}
                     type="time"
                     value={horaire.fin}
-                    onChange={(e) => onHoraireChange(jour, 'fin', e.target.value)}
+                    onChange={(e) =>
+                      onHoraireChange(jour, "fin", e.target.value)
+                    }
                     className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
@@ -52,6 +68,7 @@ const PlanningHoraires: React.FC<PlanningHorairesProps> = ({
                   type="button"
                   onClick={() => onAppliquerPartout(jour)}
                   className="text-sm text-indigo-600 hover:text-indigo-800"
+                  aria-label={`Appliquer les horaires de ${jour} à tous les jours`}
                 >
                   Appliquer à tous
                 </button>
@@ -59,17 +76,18 @@ const PlanningHoraires: React.FC<PlanningHorairesProps> = ({
             ) : (
               <span className="text-red-600 text-sm">Fermé</span>
             )}
-            
+
             <button
               type="button"
               onClick={() => onFermetureToggle(jour)}
               className={`px-3 py-1 rounded text-sm ${
                 horaire.ferme
-                  ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? "bg-red-100 text-red-700 hover:bg-red-200"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
+              aria-label={horaire.ferme ? `Rouvrir ${jour}` : `Fermer ${jour}`}
             >
-              {horaire.ferme ? 'Rouvrir' : 'Fermer'}
+              {horaire.ferme ? "Rouvrir" : "Fermer"}
             </button>
           </div>
         ))}

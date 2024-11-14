@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Download, Eye, AlertCircle } from 'lucide-react';
-import { Planning, TeamMember } from '../../types/planning';
+import React, { useState, useRef, useEffect } from "react";
+import { Download, Eye, AlertCircle } from "lucide-react";
+import { Planning, TeamMember } from "../../types/planning";
 
 interface ExportMenuProps {
   planning: Planning;
@@ -9,7 +9,12 @@ interface ExportMenuProps {
   onPreview: (memberId?: string) => void;
 }
 
-const ExportMenu: React.FC<ExportMenuProps> = ({ planning, members, onExport, onPreview }) => {
+const ExportMenu: React.FC<ExportMenuProps> = ({
+  planning,
+  members,
+  onExport,
+  onPreview,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,8 +27,8 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ planning, members, onExport, on
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleExport = async (memberId?: string) => {
@@ -31,8 +36,12 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ planning, members, onExport, on
       setIsExporting(true);
       setError(null);
       await onExport(memberId);
-    } catch (err: any) {
-      setError(err.message || 'Erreur lors de l\'export');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message || "Erreur lors de l'export");
+      } else {
+        setError("Erreur inconnue lors de l'export");
+      }
     } finally {
       setIsExporting(false);
       setIsOpen(false);
@@ -47,6 +56,8 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ planning, members, onExport, on
   return (
     <div className="relative inline-block" ref={menuRef}>
       <button
+        aria-haspopup="true"
+        aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center px-3 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 rounded-lg hover:bg-indigo-50"
       >
@@ -55,7 +66,10 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ planning, members, onExport, on
       </button>
 
       {isOpen && (
-        <div className="fixed transform -translate-x-full mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200" style={{ zIndex: 1000 }}>
+        <div
+          className="fixed transform -translate-x-full mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200"
+          style={{ zIndex: 1000 }}
+        >
           {error && (
             <div className="p-3 bg-red-50 border-b border-red-100 text-red-700 text-sm flex items-start rounded-t-lg">
               <AlertCircle className="w-4 h-4 mr-2 flex-shrink-0 mt-0.5" />
@@ -64,7 +78,9 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ planning, members, onExport, on
           )}
 
           <div className="p-3">
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">Planning équipe complet</h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-2">
+              Planning équipe complet
+            </h3>
             <div className="space-y-2">
               <button
                 onClick={() => handlePreview()}
@@ -76,7 +92,9 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ planning, members, onExport, on
               <button
                 onClick={() => handleExport()}
                 disabled={isExporting}
-                className="w-full flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 rounded-lg transition-colors"
+                className={`w-full flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 rounded-lg transition-colors ${
+                  isExporting ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               >
                 <Download className="w-4 h-4 mr-2 text-indigo-600" />
                 Télécharger le PDF complet
@@ -85,25 +103,28 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ planning, members, onExport, on
           </div>
 
           <div className="border-t border-gray-100 p-3">
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">Plannings individuels</h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-2">
+              Plannings individuels
+            </h3>
             <div className="max-h-64 overflow-y-auto space-y-2">
               {members
-                .filter(member => planning.membres.includes(member.id))
-                .map(member => (
-                  <div 
-                    key={member.id} 
+                .filter((member) => planning.membres.includes(member.id))
+                .map((member) => (
+                  <div
+                    key={member.id}
                     className="p-2 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="font-medium text-sm text-gray-900">{member.nom}</div>
-                        <div className="text-xs text-gray-500">{member.role}</div>
+                        <div className="font-medium text-sm text-gray-900">
+                          {member.nom}
+                        </div>
                       </div>
                       <div className="flex space-x-2">
                         <button
                           onClick={() => handlePreview(member.id)}
                           className="p-1 text-indigo-600 hover:text-indigo-800 rounded"
-                          title="Aperçu"
+                          aria-label={`Aperçu de ${member.nom}`}
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -111,7 +132,7 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ planning, members, onExport, on
                           onClick={() => handleExport(member.id)}
                           disabled={isExporting}
                           className="p-1 text-indigo-600 hover:text-indigo-800 rounded"
-                          title="Télécharger PDF"
+                          aria-label={`Télécharger PDF de ${member.nom}`}
                         >
                           <Download className="w-4 h-4" />
                         </button>
@@ -125,7 +146,11 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ planning, members, onExport, on
       )}
 
       {isExporting && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style={{ zIndex: 1100 }}>
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
+          style={{ zIndex: 1100 }}
+          aria-live="assertive"
+        >
           <div className="bg-white p-4 rounded-lg shadow-xl">
             <div className="flex items-center space-x-3">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>

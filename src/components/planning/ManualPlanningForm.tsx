@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
-import { Clock, Calendar } from 'lucide-react';
+import React, { useState } from "react";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
+import { Clock } from "lucide-react";
 
 interface ManualPlanningFormProps {
   jour: {
@@ -19,35 +19,41 @@ interface ManualPlanningFormProps {
     nom: string;
     role: string;
   }[];
-  onUpdate: (jourModifie: any) => void;
+  onUpdate: (jourModifie: {
+    date: string;
+    jourSemaine: string;
+    horaires: { debut: string; fin: string; ferme: boolean };
+    equipe: string[];
+    tauxPresence: number;
+  }) => void;
 }
 
 const ManualPlanningForm: React.FC<ManualPlanningFormProps> = ({
   jour,
   membres,
-  onUpdate
+  onUpdate,
 }) => {
   const [horaires, setHoraires] = useState(jour.horaires);
   const [equipeSelectionnee, setEquipeSelectionnee] = useState(jour.equipe);
 
-  const handleHoraireChange = (type: 'debut' | 'fin', value: string) => {
-    setHoraires(prev => ({
+  const handleHoraireChange = (type: "debut" | "fin", value: string) => {
+    setHoraires((prev) => ({
       ...prev,
-      [type]: value
+      [type]: value,
     }));
   };
 
   const handleFermetureToggle = () => {
-    setHoraires(prev => ({
+    setHoraires((prev) => ({
       ...prev,
-      ferme: !prev.ferme
+      ferme: !prev.ferme,
     }));
   };
 
   const handleMembreToggle = (membreId: string) => {
-    setEquipeSelectionnee(prev => 
+    setEquipeSelectionnee((prev) =>
       prev.includes(membreId)
-        ? prev.filter(id => id !== membreId)
+        ? prev.filter((id) => id !== membreId)
         : [...prev, membreId]
     );
   };
@@ -57,7 +63,7 @@ const ManualPlanningForm: React.FC<ManualPlanningFormProps> = ({
       ...jour,
       horaires,
       equipe: equipeSelectionnee,
-      tauxPresence: equipeSelectionnee.length / membres.length
+      tauxPresence: equipeSelectionnee.length / membres.length,
     });
   };
 
@@ -66,24 +72,32 @@ const ManualPlanningForm: React.FC<ManualPlanningFormProps> = ({
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">
-            {format(new Date(jour.date), 'EEEE d MMMM yyyy', { locale: fr })}
+            {format(new Date(jour.date), "EEEE d MMMM yyyy", { locale: fr })}
           </h3>
         </div>
         <div className="flex items-center space-x-4">
           {!horaires.ferme ? (
             <div className="flex items-center space-x-2">
-              <Clock className="w-5 h-5 text-gray-400" />
+              <Clock className="w-5 h-5 text-gray-400" aria-hidden="true" />
+              <label htmlFor={`${jour.date}-debut`} className="sr-only">
+                Heure de début pour {jour.jourSemaine}
+              </label>
               <input
+                id={`${jour.date}-debut`}
                 type="time"
                 value={horaires.debut}
-                onChange={(e) => handleHoraireChange('debut', e.target.value)}
+                onChange={(e) => handleHoraireChange("debut", e.target.value)}
                 className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
               <span>-</span>
+              <label htmlFor={`${jour.date}-fin`} className="sr-only">
+                Heure de fin pour {jour.jourSemaine}
+              </label>
               <input
+                id={`${jour.date}-fin`}
                 type="time"
                 value={horaires.fin}
-                onChange={(e) => handleHoraireChange('fin', e.target.value)}
+                onChange={(e) => handleHoraireChange("fin", e.target.value)}
                 className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
@@ -95,18 +109,20 @@ const ManualPlanningForm: React.FC<ManualPlanningFormProps> = ({
             onClick={handleFermetureToggle}
             className={`px-3 py-1 rounded text-sm ${
               horaires.ferme
-                ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? "bg-red-100 text-red-700 hover:bg-red-200"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
-            {horaires.ferme ? 'Rouvrir' : 'Fermer'}
+            {horaires.ferme ? "Rouvrir" : "Fermer"}
           </button>
         </div>
       </div>
 
       {!horaires.ferme && (
         <div className="mt-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Équipe du jour</h4>
+          <h4 className="text-sm font-medium text-gray-700 mb-2">
+            Équipe du jour
+          </h4>
           <div className="grid grid-cols-3 gap-2">
             {membres.map((membre) => (
               <label
@@ -124,7 +140,8 @@ const ManualPlanningForm: React.FC<ManualPlanningFormProps> = ({
             ))}
           </div>
           <div className="mt-4 text-sm text-gray-500">
-            Taux de présence: {Math.round((equipeSelectionnee.length / membres.length) * 100)}%
+            Taux de présence:{" "}
+            {Math.round((equipeSelectionnee.length / membres.length) * 100)}%
           </div>
         </div>
       )}
