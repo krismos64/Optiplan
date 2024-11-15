@@ -1,35 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { format, eachDayOfInterval, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Clock } from "lucide-react";
-import { produce } from "immer";
-
-interface Membre {
-  id: string;
-  nom: string;
-}
+import { Clock, Plus, Trash } from "lucide-react";
+import type {
+  TeamMember,
+  PlanningJour,
+  HoraireCreneau,
+} from "../../types/planning";
 
 interface ManualPlanningListProps {
   debut: string;
   fin: string;
-  membres: Membre[];
-  onSave: (jours: JourPlanning[]) => void;
-  initialJours?: JourPlanning[];
-}
-
-interface Creneau {
-  debut: string;
-  fin: string;
-}
-
-interface JourPlanning {
-  date: string;
-  jourSemaine: string;
-  equipe: {
-    membreId: string;
-    creneaux: Creneau[];
-    description?: string;
-  }[];
+  membres: TeamMember[];
+  onSave: (jours: PlanningJour[]) => void;
+  initialJours?: PlanningJour[];
 }
 
 const ManualPlanningList: React.FC<ManualPlanningListProps> = ({
@@ -39,7 +23,7 @@ const ManualPlanningList: React.FC<ManualPlanningListProps> = ({
   onSave,
   initialJours = [],
 }) => {
-  const [jours, setJours] = useState<JourPlanning[]>([]);
+  const [jours, setJours] = useState<PlanningJour[]>([]);
 
   useEffect(() => {
     if (initialJours.length > 0) {
@@ -52,13 +36,16 @@ const ManualPlanningList: React.FC<ManualPlanningListProps> = ({
       end: parseISO(fin),
     });
 
-    const joursInitiaux: JourPlanning[] = dateRange.map((date) => ({
+    const joursInitiaux: PlanningJour[] = dateRange.map((date) => ({
       date: format(date, "yyyy-MM-dd"),
       jourSemaine: format(date, "EEEE", { locale: fr }).toLowerCase(),
+      horaires: {
+        creneaux: [{ debut: "09:00", fin: "17:00" }],
+        ferme: false,
+      },
       equipe: membres.map((membre) => ({
         membreId: membre.id,
-        creneaux: [{ debut: "08:30", fin: "20:00" }],
-        description: "",
+        creneaux: [{ debut: "09:00", fin: "17:00" }],
       })),
     }));
 
@@ -66,31 +53,64 @@ const ManualPlanningList: React.FC<ManualPlanningListProps> = ({
     onSave(joursInitiaux);
   }, [debut, fin, membres, initialJours, onSave]);
 
-  const handleMembreJourUpdate = (
+  const handleCreneauxChange = (
     jourIndex: number,
     membreId: string,
-    updates: Partial<JourPlanning["equipe"][0]>
+    nouveauxCreneaux: HoraireCreneau[]
   ) => {
-    const nouveauxJours = produce(jours, (draft) => {
-      const jour = draft[jourIndex];
+    setJours((prevJours) => {
+      const nouveauxJours = [...prevJours];
+      const jour = nouveauxJours[jourIndex];
       const membreIndex = jour.equipe.findIndex((e) => e.membreId === membreId);
 
       if (membreIndex >= 0) {
-        jour.equipe[membreIndex] = {
-          ...jour.equipe[membreIndex],
-          ...updates,
-        };
+        jour.equipe[membreIndex].creneaux = nouveauxCreneaux;
       } else {
         jour.equipe.push({
           membreId,
-          creneaux: updates.creneaux || [],
-          description: updates.description || "",
+          creneaux: nouveauxCreneaux,
         });
       }
-    });
 
-    setJours(nouveauxJours);
-    onSave(nouveauxJours);
+      onSave(nouveauxJours);
+      return nouveauxJours;
+    });
+  };
+
+  const handleSupprimerCreneau = (
+    jourIndex: number,
+    membreId: string,
+    creneauIndex: number
+  ) => {
+    setJours((prevJours) => {
+      const nouveauxJours = [...prevJours];
+      const jour = nouveauxJours[jourIndex];
+      const membreJour = jour.equipe.find((e) => e.membreId === membreId);
+
+      if (membreJour && membreJour.creneaux.length > 1) {
+        membreJour.creneaux = membreJour.creneaux.filter(
+          (_, index) => index !== creneauIndex
+        );
+        onSave(nouveauxJours);
+      }
+
+      return nouveauxJours;
+    });
+  };
+
+  const handleAjouterCreneau = (jourIndex: number, membreId: string) => {
+    setJours((prevJours) => {
+      const nouveauxJours = [...prevJours];
+      const jour = nouveauxJours[jourIndex];
+      const membreJour = jour.equipe.find((e) => e.membreId === membreId);
+
+      if (membreJour) {
+        membreJour.creneaux.push({ debut: "09:00", fin: "17:00" });
+        onSave(nouveauxJours);
+      }
+
+      return nouveauxJours;
+    });
   };
 
   return (
@@ -102,32 +122,19 @@ const ManualPlanningList: React.FC<ManualPlanningListProps> = ({
           </h3>
 
           <div className="space-y-4">
-            {jours.map((jour, jourIndex) => (
-              <div key={jour.date} className="border rounded-lg p-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="font-medium text-gray-900">
+            {jours.map((jour, jourIndex) => {
+              const membreJour = jour.equipe.find(
+                (e) => e.membreId === membre.id
+              );
+              return (
+                <div key={jour.date} className="border rounded-lg p-4">
+                  <h4 className="font-medium text-gray-900 mb-4">
                     {format(parseISO(jour.date), "EEEE d MMMM", { locale: fr })}
                   </h4>
-                  <input
-                    type="text"
-                    placeholder="Description (si non travaillé)"
-                    value={
-                      jour.equipe.find((e) => e.membreId === membre.id)
-                        ?.description || ""
-                    }
-                    onChange={(e) =>
-                      handleMembreJourUpdate(jourIndex, membre.id, {
-                        description: e.target.value,
-                      })
-                    }
-                    className="p-2 border rounded-lg w-full"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  {jour.equipe
-                    .find((e) => e.membreId === membre.id)
-                    ?.creneaux.map((creneau, creneauIndex) => (
+                  <div className="space-y-2">
+                    {(
+                      membreJour?.creneaux || [{ debut: "09:00", fin: "17:00" }]
+                    ).map((creneau, creneauIndex) => (
                       <div
                         key={creneauIndex}
                         className="flex items-center space-x-2"
@@ -138,17 +145,17 @@ const ManualPlanningList: React.FC<ManualPlanningListProps> = ({
                           value={creneau.debut}
                           onChange={(e) => {
                             const nouveauxCreneaux = [
-                              ...(jour.equipe.find(
-                                (e) => e.membreId === membre.id
-                              )?.creneaux || []),
+                              ...(membreJour?.creneaux || []),
                             ];
                             nouveauxCreneaux[creneauIndex] = {
                               ...nouveauxCreneaux[creneauIndex],
                               debut: e.target.value,
                             };
-                            handleMembreJourUpdate(jourIndex, membre.id, {
-                              creneaux: nouveauxCreneaux,
-                            });
+                            handleCreneauxChange(
+                              jourIndex,
+                              membre.id,
+                              nouveauxCreneaux
+                            );
                           }}
                           className="p-2 border rounded-lg"
                         />
@@ -158,56 +165,51 @@ const ManualPlanningList: React.FC<ManualPlanningListProps> = ({
                           value={creneau.fin}
                           onChange={(e) => {
                             const nouveauxCreneaux = [
-                              ...(jour.equipe.find(
-                                (e) => e.membreId === membre.id
-                              )?.creneaux || []),
+                              ...(membreJour?.creneaux || []),
                             ];
                             nouveauxCreneaux[creneauIndex] = {
                               ...nouveauxCreneaux[creneauIndex],
                               fin: e.target.value,
                             };
-                            handleMembreJourUpdate(jourIndex, membre.id, {
-                              creneaux: nouveauxCreneaux,
-                            });
+                            handleCreneauxChange(
+                              jourIndex,
+                              membre.id,
+                              nouveauxCreneaux
+                            );
                           }}
                           className="p-2 border rounded-lg"
                         />
-                        <button
-                          onClick={() => {
-                            const nouveauxCreneaux = [
-                              ...(jour.equipe.find(
-                                (e) => e.membreId === membre.id
-                              )?.creneaux || []),
-                            ];
-                            nouveauxCreneaux.splice(creneauIndex, 1);
-                            handleMembreJourUpdate(jourIndex, membre.id, {
-                              creneaux: nouveauxCreneaux,
-                            });
-                          }}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          ×
-                        </button>
+                        {membreJour &&
+                          membreJour.creneaux &&
+                          membreJour.creneaux.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleSupprimerCreneau(
+                                  jourIndex,
+                                  membre.id,
+                                  creneauIndex
+                                )
+                              }
+                              className="p-1 text-red-600 hover:text-red-800 rounded-full hover:bg-red-50"
+                            >
+                              <Trash className="w-4 h-4" />
+                            </button>
+                          )}
                       </div>
                     ))}
-                  <button
-                    onClick={() => {
-                      const nouveauxCreneaux = [
-                        ...(jour.equipe.find((e) => e.membreId === membre.id)
-                          ?.creneaux || []),
-                      ];
-                      nouveauxCreneaux.push({ debut: "09:00", fin: "17:00" });
-                      handleMembreJourUpdate(jourIndex, membre.id, {
-                        creneaux: nouveauxCreneaux,
-                      });
-                    }}
-                    className="text-indigo-600 hover:text-indigo-800 text-sm"
-                  >
-                    + Ajouter un créneau
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAjouterCreneau(jourIndex, membre.id)}
+                      className="flex items-center space-x-1 text-sm text-indigo-600 hover:text-indigo-800"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Ajouter un créneau</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ))}

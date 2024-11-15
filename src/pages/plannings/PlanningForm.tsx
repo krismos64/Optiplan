@@ -11,7 +11,6 @@ import { db } from "../../config/firebase";
 import MemberSelection from "../../components/planning/MemberSelection";
 import ManualPlanningList from "./ManualPlanningList";
 
-// Typage des interfaces
 interface PlanningFormProps {
   onClose: () => void;
   planning?: Planning;
@@ -29,12 +28,11 @@ interface Planning {
 interface Membre {
   id: string;
   nom: string;
+  heuresHebdo: number;
+  compteurHeures: number;
 }
 
-interface PlanningJour {
-  date: string;
-  equipe: { membreId: string; creneaux: { debut: string; fin: string }[] }[];
-}
+import { PlanningJour } from "../../types/planning";
 
 const PlanningForm: React.FC<PlanningFormProps> = ({ onClose, planning }) => {
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -67,23 +65,41 @@ const PlanningForm: React.FC<PlanningFormProps> = ({ onClose, planning }) => {
       }
     };
 
-    if (!planning) {
-      loadMembers();
-    } else {
-      setMembers(planning.membres || []);
+    loadMembers();
+  }, []);
+
+  const validateStep = () => {
+    switch (currentStep) {
+      case 1:
+        if (!formData.nom || !formData.debut || !formData.fin) {
+          setError("Veuillez remplir tous les champs");
+          return false;
+        }
+        if (new Date(formData.fin) < new Date(formData.debut)) {
+          setError("La date de fin doit être postérieure à la date de début");
+          return false;
+        }
+        break;
+      case 2:
+        if (formData.membresSelectionnes.length === 0) {
+          setError("Veuillez sélectionner au moins un membre");
+          return false;
+        }
+        break;
     }
-  }, [planning]);
+    return true;
+  };
 
   const handleNext = () => {
-    setCurrentStep((prev) => prev + 1);
-    setError(null);
-    console.log("Étape actuelle après handleNext:", currentStep + 1);
+    if (validateStep()) {
+      setCurrentStep((prev) => prev + 1);
+      setError(null);
+    }
   };
 
   const handleBack = () => {
     setCurrentStep((prev) => prev - 1);
     setError(null);
-    console.log("Étape actuelle après handleBack:", currentStep - 1);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -199,15 +215,16 @@ const PlanningForm: React.FC<PlanningFormProps> = ({ onClose, planning }) => {
         );
 
       case 3:
+        const selectedMembers = members.filter((m) =>
+          formData.membresSelectionnes.includes(m.id)
+        );
         return (
           <ManualPlanningList
             debut={formData.debut}
             fin={formData.fin}
-            membres={members.filter((m) =>
-              formData.membresSelectionnes.includes(m.id)
-            )}
+            membres={selectedMembers}
             onSave={setPlanningJours}
-            initialJours={[]} // Testez avec une liste vide
+            initialJours={planningJours}
           />
         );
 
@@ -218,7 +235,7 @@ const PlanningForm: React.FC<PlanningFormProps> = ({ onClose, planning }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg w-full max-w-4xl p-6">
+      <div className="bg-white rounded-lg w-full max-w-4xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h2 className="text-2xl font-bold text-indigo-900">
@@ -240,7 +257,7 @@ const PlanningForm: React.FC<PlanningFormProps> = ({ onClose, planning }) => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="space-y-6">
           {renderStepContent()}
 
           <div className="mt-8 flex justify-between">

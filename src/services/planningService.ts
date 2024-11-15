@@ -10,12 +10,6 @@ import {
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 
-interface TeamMember {
-  id: string;
-  nom: string;
-  heuresHebdo: number;
-}
-
 interface Planning {
   id?: string;
   nom: string;

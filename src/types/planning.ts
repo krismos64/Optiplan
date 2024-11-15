@@ -8,17 +8,11 @@ export interface HoraireJour {
   ferme: boolean;
 }
 
-export interface Planning {
+export interface TeamMember {
   id: string;
   nom: string;
-  debut: string;
-  fin: string;
-  membres: string[];
-  horaires: {
-    [jour: string]: HoraireJour;
-  };
-  jours: PlanningJour[];
-  isManual: boolean;
+  heuresHebdo: number;
+  compteurHeures: number;
 }
 
 export interface PlanningJour {
@@ -29,12 +23,17 @@ export interface PlanningJour {
     membreId: string;
     creneaux: HoraireCreneau[];
   }[];
-  tauxPresence: number;
 }
 
-export interface TeamMember {
-  id: string;
+export interface Planning {
+  id?: string;
   nom: string;
-  heuresHebdo: number;
-  compteurHeures: number;
+  debut: string;
+  fin: string;
+  membres: TeamMember[];
+  horaires: {
+    [jour: string]: HoraireJour;
+  };
+  jours: PlanningJour[];
+  isManual: boolean;
 }

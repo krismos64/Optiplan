@@ -3,10 +3,8 @@ import {
   Plus,
   Search,
   Calendar,
-  Download,
   Trash2,
   Edit2,
-  X,
   AlertCircle,
   Eye,
 } from "lucide-react";
@@ -15,35 +13,37 @@ import PlanningForm from "./PlanningForm";
 import DeleteConfirmationModal from "../../components/modals/DeleteConfirmationModal";
 import PlanningPreview from "../../components/planning/PlanningPreview";
 import { firebaseService } from "../../services/firebaseService";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import { UserOptions } from "jspdf-autotable";
+import type { TeamMember, Planning, PlanningJour } from "../../types/planning";
 
-interface TeamMember {
-  id: string;
-  nom: string;
+// Extension de jsPDF pour inclure lastAutoTable
+interface ExtendedJsPDF extends jsPDF {
+  lastAutoTable?: {
+    finalY: number;
+  };
 }
 
-// Définir un type pour représenter un planning
-interface Planning {
-  id: string;
-  nom: string;
-  debut: string;
-  fin: string;
-  membres: TeamMember[];
-  jours?: Array<any>;
+// Extension des options d'autoTable
+interface ExtendedUserOptions extends UserOptions {
+  startY?: number;
 }
 
 const PlanningList = () => {
   const [plannings, setPlannings] = useState<Planning[]>([]);
+  const [membres, setMembres] = useState<TeamMember[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedPlanning, setSelectedPlanning] = useState<
     Planning | undefined
   >(undefined);
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
-  const [showPreview, setShowPreview] = useState<boolean>(false);
   const [editingPlanning, setEditingPlanning] = useState<Planning | undefined>(
     undefined
   );
   const [loading, setLoading] = useState<boolean>(true);
   const [showForm, setShowForm] = useState<boolean>(false);
+  const [showPreview, setShowPreview] = useState<boolean>(false);
 
   const { error, handleFirebaseOperation } = useFirebaseError();
 
@@ -52,9 +52,7 @@ const PlanningList = () => {
       setLoading(true);
       try {
         const result = await firebaseService.getPlannings();
-        if (result) {
-          setPlannings(result as Planning[]);
-        }
+        setPlannings(result as unknown as Planning[]);
       } catch (err) {
         console.error("Erreur lors du chargement des plannings:", err);
       } finally {
@@ -62,7 +60,24 @@ const PlanningList = () => {
       }
     };
 
+    const loadMembres = async () => {
+      try {
+        const result = await firebaseService.getTeamMembers();
+        setMembres(
+          result.map((member: Partial<TeamMember>) => ({
+            id: member.id || "",
+            nom: member.nom || "",
+            heuresHebdo: member.heuresHebdo || 0,
+            compteurHeures: member.compteurHeures || 0,
+          }))
+        );
+      } catch (err) {
+        console.error("Erreur lors du chargement des membres:", err);
+      }
+    };
+
     loadPlannings();
+    loadMembres();
   }, []);
 
   const handleDelete = async (planningId: string) => {
@@ -73,27 +88,57 @@ const PlanningList = () => {
       setSelectedPlanning(undefined);
     }, "Erreur lors de la suppression du planning");
   };
-  function exportToPDF(nom: string, jours: Array<any>) {
-    console.log("Export du planning:", nom);
-    console.log("Nombre de jours:", jours.length); // Utilise `jours` pour éviter l'erreur
-    // Logique d'export en PDF
-  }
-
-  const handleExport = async (planning: Planning) => {
-    // Assurez-vous d'utiliser le bon nombre d'arguments requis pour exportToPDF
-    await handleFirebaseOperation(async () => {
-      await exportToPDF(
-        planning?.nom || "Nom par défaut",
-        planning.jours || []
-      );
-
-      alert("Planning exporté avec succès !");
-    }, "Erreur lors de l'export du planning");
-  };
 
   const handlePreview = (planning: Planning) => {
     setSelectedPlanning(planning);
     setShowPreview(true);
+  };
+
+  const handleExportPDF = (planning: Planning, memberId?: string) => {
+    const doc = new jsPDF() as ExtendedJsPDF;
+    doc.setFontSize(14);
+
+    if (memberId) {
+      const member = membres.find((m) => m.id === memberId);
+      if (!member) return;
+
+      doc.text(`Planning Individuel - ${member.nom}`, 10, 10);
+      planning.jours.forEach((jour: PlanningJour) => {
+        const memberDay = jour.equipe.find((e) => e.membreId === memberId);
+        if (memberDay) {
+          const schedule = memberDay.creneaux.map(
+            (creneau) => `${creneau.debut} - ${creneau.fin}`
+          );
+          const options: ExtendedUserOptions = {
+            startY: doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 20,
+            head: [[`Date: ${jour.date}`, "Horaires"]],
+            body: schedule.map((s) => [s]),
+          };
+          autoTable(doc, options);
+        }
+      });
+      doc.save(`${planning.nom}_${member.nom}.pdf`);
+    } else {
+      doc.text(`Planning Équipe - ${planning.nom}`, 10, 10);
+      planning.jours.forEach((jour: PlanningJour) => {
+        const membersSchedules = jour.equipe.map((equipeMembre) => {
+          const memberInfo = membres.find(
+            (m) => m.id === equipeMembre.membreId
+          );
+          const schedule = equipeMembre.creneaux
+            .map((creneau) => `${creneau.debut} - ${creneau.fin}`)
+            .join(", ");
+          return [memberInfo ? memberInfo.nom : "Membre inconnu", schedule];
+        });
+        const options: ExtendedUserOptions = {
+          startY: doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 20,
+          head: [[`Date: ${jour.date}`, "Membre", "Horaires"]],
+          body: membersSchedules,
+        };
+        autoTable(doc, options);
+      });
+      doc.save(`${planning.nom}_equipe.pdf`);
+    }
   };
 
   const filteredPlannings = plannings.filter((planning) =>
@@ -185,7 +230,7 @@ const PlanningList = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm text-gray-500">
-                        {planning.membres?.length || 0} membre(s)
+                        {planning.membres.length} membre(s)
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -193,24 +238,30 @@ const PlanningList = () => {
                         <button
                           onClick={() => handlePreview(planning)}
                           className="text-indigo-600 hover:text-indigo-900"
-                          aria-label={`Aperçu du planning ${planning.nom}`}
                         >
                           <Eye className="w-5 h-5" />
                         </button>
                         <button
-                          onClick={() => handleExport(planning)}
+                          onClick={() => handleExportPDF(planning)}
                           className="text-indigo-600 hover:text-indigo-900"
-                          aria-label={`Exporter le planning ${planning.nom}`}
                         >
-                          <Download className="w-5 h-5" />
+                          Télécharger PDF Équipe
                         </button>
+                        {planning.membres.map((member) => (
+                          <button
+                            key={member.id}
+                            onClick={() => handleExportPDF(planning, member.id)}
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            Télécharger PDF - {member.nom}
+                          </button>
+                        ))}
                         <button
                           onClick={() => {
                             setEditingPlanning(planning);
                             setShowForm(true);
                           }}
                           className="text-indigo-600 hover:text-indigo-900"
-                          aria-label={`Modifier le planning ${planning.nom}`}
                         >
                           <Edit2 className="w-5 h-5" />
                         </button>
@@ -220,7 +271,6 @@ const PlanningList = () => {
                             setShowDeleteModal(true);
                           }}
                           className="text-red-600 hover:text-red-900"
-                          aria-label={`Supprimer le planning ${planning.nom}`}
                         >
                           <Trash2 className="w-5 h-5" />
                         </button>
@@ -236,10 +286,7 @@ const PlanningList = () => {
 
       {showForm && (
         <PlanningForm
-          onClose={() => {
-            setShowForm(false);
-            setEditingPlanning(undefined);
-          }}
+          onClose={() => setShowForm(false)}
           planning={editingPlanning}
         />
       )}
@@ -248,41 +295,19 @@ const PlanningList = () => {
         <DeleteConfirmationModal
           title="Supprimer le planning"
           message={`Êtes-vous sûr de vouloir supprimer le planning "${selectedPlanning.nom}" ?`}
-          onConfirm={() => handleDelete(selectedPlanning.id)}
-          onCancel={() => {
-            setShowDeleteModal(false);
-            setSelectedPlanning(undefined);
-          }}
+          onConfirm={() =>
+            selectedPlanning?.id && handleDelete(selectedPlanning.id)
+          }
+          onCancel={() => setShowDeleteModal(false)}
         />
       )}
 
       {showPreview && selectedPlanning && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg w-full max-w-6xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white px-6 py-4 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-indigo-900">
-                  Aperçu du planning
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowPreview(false);
-                    setSelectedPlanning(undefined);
-                  }}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-            </div>
-            <div className="p-6">
-              <PlanningPreview
-                jours={selectedPlanning?.jours || []}
-                membres={selectedPlanning?.membres || []}
-              />
-            </div>
-          </div>
-        </div>
+        <PlanningPreview
+          jours={selectedPlanning.jours}
+          membres={membres}
+          onClose={() => setShowPreview(false)}
+        />
       )}
     </div>
   );

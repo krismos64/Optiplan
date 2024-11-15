@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 interface TeamMember {
   id: string;
@@ -16,7 +16,7 @@ const MemberSelection: React.FC<MemberSelectionProps> = ({
   members = [],
   selectedMembers = [],
   onMemberToggle,
-  onSelectAll
+  onSelectAll,
 }) => {
   return (
     <div>
@@ -29,8 +29,9 @@ const MemberSelection: React.FC<MemberSelectionProps> = ({
           onClick={onSelectAll}
           className="text-sm text-indigo-600 hover:text-indigo-800"
         >
-          {selectedMembers.length === members.length ? 
-            'Désélectionner tout' : 'Sélectionner tout'}
+          {selectedMembers.length === members.length
+            ? "Désélectionner tout"
+            : "Sélectionner tout"}
         </button>
       </div>
       <div className="grid grid-cols-3 gap-2">
