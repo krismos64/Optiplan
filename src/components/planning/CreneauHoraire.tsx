@@ -1,149 +1,63 @@
-import React from "react";
-import { Clock, Plus, Trash } from "lucide-react";
+import React, { useState } from "react";
 import { HoraireCreneau } from "../../types/planning";
+import {
+  updateDebut,
+  updateFin,
+  isCreneauValid,
+} from "../../utils/horairesUtils";
 
 interface CreneauHoraireProps {
-  creneaux: HoraireCreneau[];
-  onChange: (creneaux: HoraireCreneau[]) => void;
-  disabled?: boolean;
-  minCreneaux?: number;
-  maxCreneaux?: number;
+  creneau: HoraireCreneau;
+  onChange: (updatedCreneau: HoraireCreneau) => void;
+  onRemove: () => void;
 }
 
 const CreneauHoraire: React.FC<CreneauHoraireProps> = ({
-  creneaux,
+  creneau,
   onChange,
-  disabled = false,
-  minCreneaux = 1,
-  maxCreneaux = 3,
+  onRemove,
 }) => {
-  const validerCreneau = (creneau: HoraireCreneau): boolean => {
-    const [debutH, debutM] = creneau.debut.split(":").map(Number);
-    const [finH, finM] = creneau.fin.split(":").map(Number);
-    return finH * 60 + finM > debutH * 60 + debutM;
-  };
+  const [debut, setDebut] = useState(creneau.debut);
+  const [fin, setFin] = useState(creneau.fin);
 
-  const verifierChevauchement = (
-    nouveauxCreneaux: HoraireCreneau[]
-  ): boolean => {
-    for (let i = 0; i < nouveauxCreneaux.length; i++) {
-      for (let j = i + 1; j < nouveauxCreneaux.length; j++) {
-        const [debutH1, debutM1] = nouveauxCreneaux[i].debut
-          .split(":")
-          .map(Number);
-        const [finH1, finM1] = nouveauxCreneaux[i].fin.split(":").map(Number);
-        const [debutH2, debutM2] = nouveauxCreneaux[j].debut
-          .split(":")
-          .map(Number);
-        const [finH2, finM2] = nouveauxCreneaux[j].fin.split(":").map(Number);
-
-        const debut1 = debutH1 * 60 + debutM1;
-        const fin1 = finH1 * 60 + finM1;
-        const debut2 = debutH2 * 60 + debutM2;
-        const fin2 = finH2 * 60 + finM2;
-
-        if (
-          (debut1 < fin2 && fin1 > debut2) ||
-          (debut2 < fin1 && fin2 > debut1)
-        ) {
-          return true;
-        }
-      }
-    }
-    return false;
-  };
-
-  const ajouterCreneau = () => {
-    if (creneaux.length < maxCreneaux) {
-      const nouveauCreneau = { debut: "09:00", fin: "17:00" };
-      const nouveauxCreneaux = [...creneaux, nouveauCreneau];
-      if (!verifierChevauchement(nouveauxCreneaux)) {
-        onChange(nouveauxCreneaux);
-      }
+  const handleDebutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDebut = e.target.value;
+    const updatedCreneau = updateDebut(creneau, newDebut);
+    setDebut(newDebut);
+    if (isCreneauValid(updatedCreneau)) {
+      onChange(updatedCreneau);
     }
   };
 
-  const supprimerCreneau = (index: number) => {
-    if (creneaux.length > minCreneaux) {
-      const nouveauxCreneaux = creneaux.filter((_, i) => i !== index);
-      onChange(nouveauxCreneaux);
-    }
-  };
-
-  const modifierCreneau = (
-    index: number,
-    type: "debut" | "fin",
-    valeur: string
-  ) => {
-    const nouveauxCreneaux = [...creneaux];
-    const nouveauCreneau = { ...nouveauxCreneaux[index], [type]: valeur };
-
-    if (validerCreneau(nouveauCreneau)) {
-      nouveauxCreneaux[index] = nouveauCreneau;
-      if (!verifierChevauchement(nouveauxCreneaux)) {
-        onChange(nouveauxCreneaux);
-      }
+  const handleFinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newFin = e.target.value;
+    const updatedCreneau = updateFin(creneau, newFin);
+    setFin(newFin);
+    if (isCreneauValid(updatedCreneau)) {
+      onChange(updatedCreneau);
     }
   };
 
   return (
-    <div className="space-y-2">
-      {creneaux.map((creneau, index) => (
-        <div key={index} className="flex items-center space-x-2">
-          <Clock className="w-4 h-4 text-gray-400" />
-          <input
-            type="time"
-            value={creneau.debut}
-            onChange={(e) => modifierCreneau(index, "debut", e.target.value)}
-            className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            disabled={disabled}
-          />
-          <span>-</span>
-          <input
-            type="time"
-            value={creneau.fin}
-            onChange={(e) => modifierCreneau(index, "fin", e.target.value)}
-            className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            disabled={disabled}
-          />
-          {!disabled && creneaux.length > minCreneaux && (
-            <button
-              type="button"
-              onClick={() => supprimerCreneau(index)}
-              aria-label="Supprimer ce créneau"
-              className="p-1 text-red-600 hover:text-red-800 rounded-full hover:bg-red-50"
-            >
-              <Trash className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      ))}
-
-      {!disabled && creneaux.length < maxCreneaux && (
-        <button
-          type="button"
-          onClick={ajouterCreneau}
-          aria-label="Ajouter un créneau"
-          className="flex items-center space-x-1 text-sm text-indigo-600 hover:text-indigo-800"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Ajouter un créneau</span>
-        </button>
-      )}
-
-      {creneaux.length > 0 && (
-        <div className="text-sm text-gray-500">
-          Total :{" "}
-          {creneaux
-            .reduce((acc, creneau) => {
-              const [debutH, debutM] = creneau.debut.split(":").map(Number);
-              const [finH, finM] = creneau.fin.split(":").map(Number);
-              return acc + (finH * 60 + finM - (debutH * 60 + debutM)) / 60;
-            }, 0)
-            .toFixed(1)}
-          h
-        </div>
-      )}
+    <div className="flex items-center space-x-2">
+      <input
+        type="time"
+        value={debut}
+        onChange={handleDebutChange}
+        className="border rounded px-2 py-1 text-sm"
+      />
+      <input
+        type="time"
+        value={fin}
+        onChange={handleFinChange}
+        className="border rounded px-2 py-1 text-sm"
+      />
+      <button
+        onClick={onRemove}
+        className="text-red-600 hover:text-red-800 text-sm font-medium"
+      >
+        Supprimer
+      </button>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Download, Eye, AlertCircle } from "lucide-react";
 import { Planning, TeamMember } from "../../types/planning";
+import { isCreneauValid } from "../../utils/horairesUtils";
 
 interface ExportMenuProps {
   planning: Planning;
@@ -35,6 +36,19 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
     try {
       setIsExporting(true);
       setError(null);
+
+      // Vérification des créneaux avant l'exportation
+      const isValid = planning.jours.every(
+        (jour) =>
+          Array.isArray(jour.horaires) && jour.horaires.every(isCreneauValid)
+      );
+
+      if (!isValid) {
+        throw new Error(
+          "Certains créneaux ne sont pas valides et ne peuvent pas être exportés."
+        );
+      }
+
       await onExport(memberId);
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -59,7 +73,7 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
         aria-haspopup="true"
         aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center px-3 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 rounded-lg hover:bg-indigo-50"
+        className="flex items-center px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 rounded-lg hover:bg-blue-50"
       >
         <Download className="w-4 h-4 mr-2" />
         Actions
@@ -67,7 +81,7 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
 
       {isOpen && (
         <div
-          className="fixed transform -translate-x-full mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200"
+          className="fixed transform translate-x-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-300"
           style={{ zIndex: 1000 }}
         >
           {error && (
@@ -84,19 +98,19 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
             <div className="space-y-2">
               <button
                 onClick={() => handlePreview()}
-                className="w-full flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 rounded-lg transition-colors"
+                className="w-full flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-lg transition-colors"
               >
-                <Eye className="w-4 h-4 mr-2 text-indigo-600" />
+                <Eye className="w-4 h-4 mr-2 text-blue-600" />
                 Aperçu du planning complet
               </button>
               <button
                 onClick={() => handleExport()}
                 disabled={isExporting}
-                className={`w-full flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 rounded-lg transition-colors ${
+                className={`w-full flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-lg transition-colors ${
                   isExporting ? "opacity-50 cursor-not-allowed" : ""
                 }`}
               >
-                <Download className="w-4 h-4 mr-2 text-indigo-600" />
+                <Download className="w-4 h-4 mr-2 text-blue-600" />
                 Télécharger le PDF complet
               </button>
             </div>
@@ -108,7 +122,9 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
             </h3>
             <div className="max-h-64 overflow-y-auto space-y-2">
               {members
-                .filter((member) => planning.membres.includes(member.id))
+                .filter((member) =>
+                  planning.membres.map((m) => m.id).includes(member.id)
+                )
                 .map((member) => (
                   <div
                     key={member.id}
@@ -123,7 +139,7 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
                       <div className="flex space-x-2">
                         <button
                           onClick={() => handlePreview(member.id)}
-                          className="p-1 text-indigo-600 hover:text-indigo-800 rounded"
+                          className="p-1 text-blue-600 hover:text-blue-800 rounded"
                           aria-label={`Aperçu de ${member.nom}`}
                         >
                           <Eye className="w-4 h-4" />
@@ -131,7 +147,7 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
                         <button
                           onClick={() => handleExport(member.id)}
                           disabled={isExporting}
-                          className="p-1 text-indigo-600 hover:text-indigo-800 rounded"
+                          className="p-1 text-blue-600 hover:text-blue-800 rounded"
                           aria-label={`Télécharger PDF de ${member.nom}`}
                         >
                           <Download className="w-4 h-4" />
@@ -153,7 +169,7 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
         >
           <div className="bg-white p-4 rounded-lg shadow-xl">
             <div className="flex items-center space-x-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
               <span>Export en cours...</span>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 import { X } from "lucide-react";
@@ -17,7 +17,16 @@ const PlanningPreview: React.FC<PlanningPreviewProps> = ({
   onClose,
   membreId,
 }) => {
-  const membre = membreId ? membres.find((m) => m.id === membreId) : null;
+  const [selectedMembre, setSelectedMembre] = useState<TeamMember | null>(null);
+
+  useEffect(() => {
+    if (membreId) {
+      const membre = membres.find((m) => m.id === membreId) || null;
+      setSelectedMembre(membre);
+    } else {
+      setSelectedMembre(null);
+    }
+  }, [membreId, membres]);
 
   const formatCreneaux = (creneaux: { debut: string; fin: string }[]) => {
     return creneaux.map((c) => `${c.debut} - ${c.fin}`).join(", ");
@@ -28,7 +37,9 @@ const PlanningPreview: React.FC<PlanningPreviewProps> = ({
       <div className="bg-white rounded-lg w-full max-w-4xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-indigo-900">
-            {membre ? `Planning de ${membre.nom}` : "Planning d'équipe"}
+            {selectedMembre
+              ? `Planning de ${selectedMembre.nom}`
+              : "Planning d'équipe"}
           </h2>
           <button
             onClick={onClose}
@@ -58,9 +69,9 @@ const PlanningPreview: React.FC<PlanningPreviewProps> = ({
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {jours.map((jour) => {
-                const membreJour = membreId
-                  ? jour.equipe.find((e) => e.membreId === membreId)
-                  : null;
+                const membresSelectionnes = membreId
+                  ? jour.equipe.filter((e) => e.membreId === membreId)
+                  : jour.equipe;
 
                 return (
                   <tr key={jour.date} className="hover:bg-gray-50">
@@ -77,13 +88,13 @@ const PlanningPreview: React.FC<PlanningPreviewProps> = ({
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {membreId && membreJour ? (
+                      {membreId && membresSelectionnes.length > 0 ? (
                         <div className="text-sm text-gray-900">
-                          {formatCreneaux(membreJour.creneaux)}
+                          {formatCreneaux(membresSelectionnes[0].creneaux)}
                         </div>
                       ) : (
                         <div className="flex flex-wrap gap-2">
-                          {jour.equipe.map((equipeMembre) => {
+                          {membresSelectionnes.map((equipeMembre) => {
                             const membre = membres.find(
                               (m) => m.id === equipeMembre.membreId
                             );
@@ -106,7 +117,7 @@ const PlanningPreview: React.FC<PlanningPreviewProps> = ({
                     {!membreId && (
                       <td className="px-6 py-4">
                         <div className="flex flex-wrap gap-1">
-                          {jour.equipe.map(({ membreId }) => {
+                          {membresSelectionnes.map(({ membreId }) => {
                             const membre = membres.find(
                               (m) => m.id === membreId
                             );

@@ -1,12 +1,8 @@
-import React from "react";
-
-interface TeamMember {
-  id: string;
-  nom: string;
-}
+import React, { useEffect, useState } from "react";
+import type { TeamMember } from "../../types/planning";
 
 interface MemberSelectionProps {
-  members: TeamMember[];
+  members?: TeamMember[];
   selectedMembers: string[];
   onMemberToggle: (memberId: string, selected: boolean) => void;
   onSelectAll: () => void;
@@ -18,6 +14,12 @@ const MemberSelection: React.FC<MemberSelectionProps> = ({
   onMemberToggle,
   onSelectAll,
 }) => {
+  const [localMembers, setLocalMembers] = useState<TeamMember[]>(members);
+
+  useEffect(() => {
+    setLocalMembers(members);
+  }, [members]);
+
   return (
     <div>
       <div className="flex justify-between items-center mb-2">
@@ -29,13 +31,13 @@ const MemberSelection: React.FC<MemberSelectionProps> = ({
           onClick={onSelectAll}
           className="text-sm text-indigo-600 hover:text-indigo-800"
         >
-          {selectedMembers.length === members.length
+          {selectedMembers.length === localMembers.length
             ? "Désélectionner tout"
             : "Sélectionner tout"}
         </button>
       </div>
       <div className="grid grid-cols-3 gap-2">
-        {members.map((member) => (
+        {localMembers.map((member) => (
           <label
             key={member.id}
             className="flex items-center p-2 border rounded-lg hover:bg-gray-50"
